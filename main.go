@@ -2,7 +2,6 @@ package main
 
 import (
 	"embed"
-	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -46,20 +45,16 @@ func (h *FileLoader) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	// Convert to OS-specific path separators
 	filePath = filepath.FromSlash(filePath)
 
-	fileData, err := os.ReadFile(filePath)
-	if err != nil {
+	// Verify file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		res.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	// Detect content type from extension
-	ext := filepath.Ext(filePath)
-	contentType := mime.TypeByExtension(ext)
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
-	res.Header().Set("Content-Type", contentType)
-	res.Write(fileData)
+	// Use http.ServeFile to stream the file instead of loading it all into
+	// memory. This prevents OOM crashes on large video files (e.g. 1.7 GB)
+	// and enables HTTP Range requests for video seeking.
+	http.ServeFile(res, req, filePath)
 }
 
 func main() {

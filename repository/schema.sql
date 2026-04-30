@@ -26,7 +26,9 @@ CREATE TABLE IF NOT EXISTS player_configs (
     id              TEXT PRIMARY KEY,
     name            TEXT NOT NULL,
     total_time      INTEGER NOT NULL DEFAULT 0,
-    transition_time INTEGER NOT NULL DEFAULT 0
+    transition_time INTEGER NOT NULL DEFAULT 0,
+    time_per_picture INTEGER NOT NULL DEFAULT 5,
+    sound_source    TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS player_media (

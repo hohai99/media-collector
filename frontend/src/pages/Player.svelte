@@ -7,13 +7,15 @@
         navigateTo('player-builder');
     }
 
-    $: transitionTime = $activeConfig?.transitionTime || 5;
+    $: timePerPicture = $activeConfig?.timePerPicture || $activeConfig?.transitionTime || 5;
+    $: soundSource = $activeConfig?.soundSource || '';
 </script>
 
 {#if $playerMedia.length > 0}
     <PlayerView
         mediaList={$playerMedia}
-        {transitionTime}
+        {timePerPicture}
+        {soundSource}
         on:exit={handleExit}
     />
 {:else}

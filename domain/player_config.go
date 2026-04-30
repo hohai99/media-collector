@@ -6,14 +6,17 @@ type PlayerConfig struct {
 	Name           string   `json:"name"`
 	Collections    []string `json:"collections,omitempty"`
 	MediaIDs       []string `json:"mediaIds,omitempty"`
-	TotalPlayTime  int      `json:"totalPlayTime"`  // seconds
-	TransitionTime int      `json:"transitionTime"` // seconds
+	TimePerPicture int      `json:"timePerPicture"` // seconds per image slide
+	TotalPlayTime  int      `json:"totalPlayTime"`  // seconds (auto-calculated)
+	TransitionTime int      `json:"transitionTime"` // seconds (kept for compat, = TimePerPicture)
+	SoundSource    string   `json:"soundSource,omitempty"` // optional background audio path
 }
 
 // CreateConfigInput is the input payload for creating a new player config.
 type CreateConfigInput struct {
-	Name          string   `json:"name"`
-	Collections   []string `json:"collections,omitempty"`
-	MediaIDs      []string `json:"mediaIds,omitempty"`
-	TotalPlayTime int      `json:"totalPlayTime"`
+	Name           string   `json:"name"`
+	Collections    []string `json:"collections,omitempty"`
+	MediaIDs       []string `json:"mediaIds,omitempty"`
+	TimePerPicture int      `json:"timePerPicture"` // seconds per image slide
+	SoundSource    string   `json:"soundSource,omitempty"`
 }

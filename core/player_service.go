@@ -29,34 +29,61 @@ func NewPlayerService(
 	}
 }
 
-// CreateConfig creates a new player config. The transition time is
-// automatically calculated from the total play time and the number of
-// resolved media items.
+// CreateConfig creates a new player config. The total play time is
+// auto-calculated: totalPlayTime = numberOfImages × timePerPicture.
+// Videos play at their natural duration and are not counted.
 func (s *PlayerService) CreateConfig(input domain.CreateConfigInput) (*domain.PlayerConfig, error) {
-	// Resolve the total media count for transition calculation
-	mediaCount := len(input.MediaIDs)
-	for _, colID := range input.Collections {
-		// Count media in this collection + all descendants
-		items, err := s.getMediaRecursive(colID)
+	// Resolve all media to count images
+	var allMedia []domain.Media
+
+	// Direct media
+	if len(input.MediaIDs) > 0 {
+		directMedia, err := s.mediaRepo.GetByIDs(input.MediaIDs)
 		if err != nil {
-			return nil, fmt.Errorf("count media in collection %q: %w", colID, err)
+			return nil, fmt.Errorf("get direct media: %w", err)
 		}
-		mediaCount += len(items)
+		allMedia = append(allMedia, directMedia...)
 	}
 
-	if mediaCount == 0 {
+	// Collection media (recursive)
+	for _, colID := range input.Collections {
+		colMedia, err := s.getMediaRecursive(colID)
+		if err != nil {
+			return nil, fmt.Errorf("get collection %q media: %w", colID, err)
+		}
+		allMedia = append(allMedia, colMedia...)
+	}
+
+	if len(allMedia) == 0 {
 		return nil, fmt.Errorf("no media selected")
 	}
 
-	transition := CalculateTransition(input.TotalPlayTime, mediaCount)
+	// Count images for time calculation
+	imageCount := 0
+	for _, m := range allMedia {
+		if m.Type == domain.MediaTypeImage {
+			imageCount++
+		}
+	}
+
+	timePerPicture := input.TimePerPicture
+	if timePerPicture <= 0 {
+		timePerPicture = 5 // default 5 seconds
+	}
+
+	// Auto-calculate total play time for images only
+	// (videos play at their natural duration, not factored in)
+	totalPlayTime := imageCount * timePerPicture
 
 	cfg := domain.PlayerConfig{
 		ID:             uuid.New().String(),
 		Name:           input.Name,
 		Collections:    input.Collections,
 		MediaIDs:       input.MediaIDs,
-		TotalPlayTime:  input.TotalPlayTime,
-		TransitionTime: transition,
+		TimePerPicture: timePerPicture,
+		TotalPlayTime:  totalPlayTime,
+		TransitionTime: timePerPicture, // kept for backward compat
+		SoundSource:    input.SoundSource,
 	}
 
 	if err := s.playerRepo.InsertConfig(cfg); err != nil {

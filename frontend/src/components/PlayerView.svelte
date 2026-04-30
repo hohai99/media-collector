@@ -1,16 +1,18 @@
 <script>
-    import { createEventDispatcher, onDestroy } from 'svelte';
+    import { createEventDispatcher, onDestroy, onMount } from 'svelte';
     import { formatDuration, localFileUrl } from '../services/utils.js';
     import { isPlaying, currentIndex, playerMedia } from '../stores/player.js';
 
     export let mediaList = [];
-    export let transitionTime = 5;
+    export let timePerPicture = 5;
+    export let soundSource = '';
 
     const dispatch = createEventDispatcher();
 
     let timer = null;
     let progress = 0;
     let progressTimer = null;
+    let soundEl = null;
 
     $: currentMedia = mediaList[$currentIndex] || null;
     $: totalItems = mediaList.length;
@@ -18,11 +20,13 @@
     function startPlayback() {
         isPlaying.set(true);
         scheduleNext();
+        startSound();
     }
 
     function pausePlayback() {
         isPlaying.set(false);
         clearTimers();
+        pauseSound();
     }
 
     function togglePlayback() {
@@ -39,7 +43,7 @@
             return;
         }
 
-        const duration = transitionTime * 1000;
+        const duration = timePerPicture * 1000;
         const interval = 50;
         progressTimer = setInterval(() => {
             progress += (interval / duration) * 100;
@@ -59,6 +63,7 @@
             // End of playlist
             isPlaying.set(false);
             clearTimers();
+            stopSound();
         }
     }
 
@@ -79,12 +84,36 @@
         progress = 0;
     }
 
+    // ─── Sound source management ───────────────────────────────
+    function startSound() {
+        if (!soundEl || !soundSource) return;
+        soundEl.currentTime = 0;
+        soundEl.play().catch(() => {}); // ignore autoplay rejection
+    }
+
+    function pauseSound() {
+        if (!soundEl) return;
+        soundEl.pause();
+    }
+
+    function stopSound() {
+        if (!soundEl) return;
+        soundEl.pause();
+        soundEl.currentTime = 0;
+    }
+
+    function handleSoundEnded() {
+        // If slideshow is still playing, loop the sound
+        if ($isPlaying) {
+            soundEl.currentTime = 0;
+            soundEl.play().catch(() => {});
+        }
+    }
+
+    // ─── Keyboard controls ─────────────────────────────────────
     function handleKeydown(e) {
         if (e.key === 'Escape') {
             dispatch('exit');
-        } else if (e.key === 'F11') {
-            e.preventDefault();
-            // Toggle fullscreen is handled by the player page
         } else if (e.key === 'ArrowRight' || e.key === ' ') {
             e.preventDefault();
             goNext();
@@ -95,7 +124,6 @@
     }
 
     // Auto-start when component mounts
-    import { onMount } from 'svelte';
     onMount(() => {
         currentIndex.set(0);
         startPlayback();
@@ -104,10 +132,21 @@
     onDestroy(() => {
         clearTimers();
         isPlaying.set(false);
+        stopSound();
     });
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
+
+<!-- Hidden sound source audio element -->
+{#if soundSource}
+    <audio
+        bind:this={soundEl}
+        src={localFileUrl(soundSource)}
+        on:ended={handleSoundEnded}
+        preload="auto"
+    ></audio>
+{/if}
 
 <div class="player-fullscreen">
     {#if currentMedia}
@@ -161,8 +200,12 @@
         </span>
 
         <span class="player-time text-sm text-muted">
-            {formatDuration(transitionTime)}/slide
+            {timePerPicture}s/slide
         </span>
+
+        {#if soundSource}
+            <span class="player-sound-badge text-sm">🎵</span>
+        {/if}
 
         <button class="btn btn-ghost btn-sm" on:click={() => dispatch('exit')}>✕ Exit</button>
     </div>
@@ -191,5 +234,10 @@
     .player-controls button:disabled {
         opacity: 0.3;
         cursor: not-allowed;
+    }
+
+    .player-sound-badge {
+        color: var(--accent);
+        font-weight: 600;
     }
 </style>

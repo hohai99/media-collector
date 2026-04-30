@@ -26,8 +26,8 @@ func (r *PlayerRepository) InsertConfig(cfg domain.PlayerConfig) error {
 	defer tx.Rollback()
 
 	_, err = tx.Exec(
-		`INSERT INTO player_configs (id, name, total_time, transition_time) VALUES (?, ?, ?, ?)`,
-		cfg.ID, cfg.Name, cfg.TotalPlayTime, cfg.TransitionTime,
+		`INSERT INTO player_configs (id, name, total_time, transition_time, time_per_picture, sound_source) VALUES (?, ?, ?, ?, ?, ?)`,
+		cfg.ID, cfg.Name, cfg.TotalPlayTime, cfg.TransitionTime, cfg.TimePerPicture, cfg.SoundSource,
 	)
 	if err != nil {
 		return fmt.Errorf("insert player config: %w", err)
@@ -62,8 +62,8 @@ func (r *PlayerRepository) InsertConfig(cfg domain.PlayerConfig) error {
 func (r *PlayerRepository) GetConfig(id string) (*domain.PlayerConfig, error) {
 	var cfg domain.PlayerConfig
 	err := r.db.QueryRow(
-		`SELECT id, name, total_time, transition_time FROM player_configs WHERE id = ?`, id,
-	).Scan(&cfg.ID, &cfg.Name, &cfg.TotalPlayTime, &cfg.TransitionTime)
+		`SELECT id, name, total_time, transition_time, time_per_picture, sound_source FROM player_configs WHERE id = ?`, id,
+	).Scan(&cfg.ID, &cfg.Name, &cfg.TotalPlayTime, &cfg.TransitionTime, &cfg.TimePerPicture, &cfg.SoundSource)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -107,7 +107,7 @@ func (r *PlayerRepository) GetConfig(id string) (*domain.PlayerConfig, error) {
 // GetAllConfigs returns every player config (without media/collection details for listing).
 func (r *PlayerRepository) GetAllConfigs() ([]domain.PlayerConfig, error) {
 	rows, err := r.db.Query(
-		`SELECT id, name, total_time, transition_time FROM player_configs ORDER BY name`)
+		`SELECT id, name, total_time, transition_time, time_per_picture, sound_source FROM player_configs ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("query all player configs: %w", err)
 	}
@@ -116,7 +116,7 @@ func (r *PlayerRepository) GetAllConfigs() ([]domain.PlayerConfig, error) {
 	var results []domain.PlayerConfig
 	for rows.Next() {
 		var cfg domain.PlayerConfig
-		if err := rows.Scan(&cfg.ID, &cfg.Name, &cfg.TotalPlayTime, &cfg.TransitionTime); err != nil {
+		if err := rows.Scan(&cfg.ID, &cfg.Name, &cfg.TotalPlayTime, &cfg.TransitionTime, &cfg.TimePerPicture, &cfg.SoundSource); err != nil {
 			return nil, fmt.Errorf("scan player config: %w", err)
 		}
 		results = append(results, cfg)

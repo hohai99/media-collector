@@ -36,10 +36,22 @@ func NewDB(dbPath string) (*sql.DB, error) {
 	return db, nil
 }
 
-// RunMigrations executes the embedded schema.sql to create all tables.
+// RunMigrations executes the embedded schema.sql to create all tables,
+// then applies incremental column migrations for existing databases.
 func RunMigrations(db *sql.DB) error {
 	if _, err := db.Exec(schemaSQL); err != nil {
 		return fmt.Errorf("run migrations: %w", err)
 	}
+
+	// Incremental migrations — ALTER TABLE for existing databases.
+	// SQLite ignores duplicate-column errors gracefully.
+	alterStmts := []string{
+		`ALTER TABLE player_configs ADD COLUMN time_per_picture INTEGER NOT NULL DEFAULT 5`,
+		`ALTER TABLE player_configs ADD COLUMN sound_source TEXT NOT NULL DEFAULT ''`,
+	}
+	for _, stmt := range alterStmts {
+		_, _ = db.Exec(stmt) // ignore "duplicate column" errors
+	}
+
 	return nil
 }

@@ -25,6 +25,7 @@ import {
     GetPlayerConfig,
     DeletePlayerConfig,
     ResolvePlayerMedia,
+    SelectSoundSource,
     GetAbsolutePath,
 } from '../../wailsjs/go/main/App';
 
@@ -118,6 +119,10 @@ export async function deletePlayerConfig(id) {
 
 export async function resolvePlayerMedia(configId) {
     return await ResolvePlayerMedia(configId);
+}
+
+export async function selectSoundSource() {
+    return await SelectSoundSource();
 }
 
 // ─── Utility ───────────────────────────────────────────────

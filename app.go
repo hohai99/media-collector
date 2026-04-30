@@ -275,6 +275,23 @@ func (a *App) ResolvePlayerMedia(configID string) ([]domain.Media, error) {
 	return a.playerSvc.ResolveMediaList(configID)
 }
 
+// SelectSoundSource opens a native file dialog to pick an audio/video file
+// for use as background music in a player config.
+func (a *App) SelectSoundSource() (string, error) {
+	file, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Select Sound Source",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Audio Files", Pattern: "*.mp3;*.wav;*.flac;*.aac;*.ogg;*.wma;*.m4a"},
+			{DisplayName: "Video Files (audio track)", Pattern: "*.mp4;*.mkv;*.webm;*.avi"},
+			{DisplayName: "All Files", Pattern: "*.*"},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("open file dialog: %w", err)
+	}
+	return file, nil
+}
+
 // ---------------------------------------------------------------------------
 // Utility — exposed to frontend for file path operations
 // ---------------------------------------------------------------------------

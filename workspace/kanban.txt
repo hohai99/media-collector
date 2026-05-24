@@ -1,0 +1,32 @@
+- 202604302105: 1h
+  - Initialize git repository and set up boilerplate Wails project structure
+- 202604302115: 1h
+  - docs: replace default Wails template with project-specific documentation for Media Collector
+  - write comprehensive README.md describing the project goals, tech stack, and dev guide outline
+- 202604302210: 1h
+  - chore: upgrade project license from GPLv3 to AGPLv3 in LICENSE file
+- 202604302305: 3h30p
+  - feat: implement media playback system with configurable slide timing and background audio support
+  - define player configuration domains and implement player service with SQLite repository support
+  - update SQLite schema and database initialization code to persist player configurations
+  - integrate player services on backend Go app.go/main.go
+  - build Svelte frontend page components: Player.svelte, PlayerBuilder.svelte, PlayerView.svelte
+  - allow users to configure custom slide interval duration and bind background music track
+- 202605241235: 8h30p
+  - feat(server): implement high-performance HTTP file server with 2-tier cache and HLS transcoding
+  - implement standalone local HTTP File Server (`server/`) with real-time network traffic telemetry metrics
+  - build 2-tier thumbnail cache system (`thumbs/`):
+    - Tier 1: In-process memory LRU cache using `github.com/hashicorp/golang-lru/v2` (configurable up to 500 entries)
+    - Tier 2: Persistent local disk cache in the application folder (`cache/thumbs/`) using SHA-256 keys and auto-eviction LRU logic (up to 2GB limit)
+    - Expose GET `/thumb` endpoint supporting `fit=cover` (cropping) and `fit=contain` resizing via image libraries
+  - build on-the-fly HLS video transcoding system (`transcode/`):
+    - Integrate FFmpeg command line execution next to the application binary or system PATH fallback
+    - Implement HLS cache manager at `cache/hls/` wiped automatically upon application startup
+    - Expose GET `/stream` endpoint to serve `.m3u8` playlists and `.ts` video segments
+  - integrate with frontend (Svelte):
+    - Add `hls.js` package to play live transcoded video segments inside Svelte player
+    - Add lazy loading action (`lazyload.js`) to optimize image loading in the viewport
+    - Refactor Svelte components (MediaCard, MediaGrid, CollectionCard, PlayerView) to stream images/videos from the standalone server
+  - update developer guide (docs/dev_guide.md):
+    - Add detailed instructions on where to place `ffmpeg.exe` for local development and production
+    - Update project structure map to include thumbs, server, and transcode packages

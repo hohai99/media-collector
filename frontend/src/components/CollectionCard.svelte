@@ -1,7 +1,8 @@
 <script>
     import { onMount } from 'svelte';
     import * as api from '../services/api.js';
-    import { localFileUrl } from '../services/utils.js';
+    import { localThumbUrl } from '../services/utils.js';
+    import { lazyload } from '../actions/lazyload.js';
 
     export let collection = {};
     export let onClick = () => {};
@@ -9,6 +10,8 @@
     let thumbnail = '';
     let mediaCount = 0;
     let subCount = 0;
+
+    $: thumbSrc = thumbnail ? localThumbUrl(thumbnail) : '';
 
     onMount(async () => {
         try {
@@ -28,8 +31,8 @@
 
 <button class="collection-card" on:click={() => onClick(collection)}>
     <div class="card-cover">
-        {#if thumbnail}
-            <div class="cover-image" style="background-image: url('{localFileUrl(thumbnail)}')"></div>
+        {#if thumbSrc}
+            <img use:lazyload={thumbSrc} alt={collection.name} class="cover-image" />
         {:else}
             <div class="cover-placeholder">
                 <span class="cover-icon">📁</span>
@@ -82,8 +85,9 @@
     .cover-image {
         width: 100%;
         height: 100%;
-        background-size: cover;
-        background-position: center;
+        object-fit: cover;
+        object-position: center;
+        display: block;
         transition: transform var(--duration-slow) var(--ease-out);
     }
 

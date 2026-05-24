@@ -1,15 +1,20 @@
 <script>
+    import { onMount, onDestroy } from 'svelte';
     import { selectedMedia, toggleMediaSelection } from '../stores/media.js';
-    import { formatSize, mediaTypeIcon, localFileUrl } from '../services/utils.js';
+    import { formatSize, mediaTypeIcon, localFileUrl, localThumbUrl, localStreamUrl, needsTranscode } from '../services/utils.js';
+    import { lazyload } from '../actions/lazyload.js';
+    import Hls from 'hls.js';
 
     export let media = {};
 
     $: isSelected = $selectedMedia.includes(media.id);
+    $: thumbSrc = media.type === 'image' ? localThumbUrl(media.path) : '';
 
     let showPreview = false;
+    let videoEl = null;
+    let hlsInstance = null;
 
     function handleClick(e) {
-        // If shift/ctrl held, toggle selection; otherwise open preview
         if (e.ctrlKey || e.shiftKey || e.metaKey) {
             toggleMediaSelection(media.id);
         } else {
@@ -24,7 +29,32 @@
 
     function closePreview() {
         showPreview = false;
+        destroyHls();
     }
+
+    function initHls(node) {
+        videoEl = node;
+        if (media.type === 'video' && needsTranscode(media.path)) {
+            const streamUrl = localStreamUrl(media.path);
+            if (Hls.isSupported()) {
+                hlsInstance = new Hls();
+                hlsInstance.loadSource(streamUrl);
+                hlsInstance.attachMedia(node);
+                hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+                    node.play().catch(() => {});
+                });
+            }
+        }
+    }
+
+    function destroyHls() {
+        if (hlsInstance) {
+            hlsInstance.destroy();
+            hlsInstance = null;
+        }
+    }
+
+    onDestroy(() => destroyHls());
 </script>
 
 <div
@@ -37,7 +67,12 @@
 >
     <div class="card-preview">
         {#if media.type === 'image'}
-            <div class="preview-image" style="background-image: url('{localFileUrl(media.path)}')"></div>
+            <img
+                use:lazyload={thumbSrc}
+                alt={media.name}
+                class="preview-image"
+                loading="lazy"
+            />
         {:else}
             <div class="preview-placeholder">
                 <span class="preview-icon">{mediaTypeIcon(media.type)}</span>
@@ -63,9 +98,15 @@
                 <img src={localFileUrl(media.path)} alt={media.name} />
             {:else if media.type === 'video'}
                 <!-- svelte-ignore a11y-media-has-caption -->
-                <video src={localFileUrl(media.path)} controls autoplay>
-                    <track kind="captions" />
-                </video>
+                {#if needsTranscode(media.path)}
+                    <video use:initHls controls class="hls-video">
+                        <track kind="captions" />
+                    </video>
+                {:else}
+                    <video src={localFileUrl(media.path)} controls autoplay>
+                        <track kind="captions" />
+                    </video>
+                {/if}
             {:else if media.type === 'audio'}
                 <div class="audio-preview">
                     <span class="audio-big-icon">🎵</span>
@@ -111,9 +152,10 @@
     .preview-image {
         width: 100%;
         height: 100%;
-        background-size: cover;
-        background-position: center;
+        object-fit: cover;
+        object-position: center;
         transition: transform var(--duration-normal) var(--ease-out);
+        display: block;
     }
     .media-card:hover .preview-image {
         transform: scale(1.05);

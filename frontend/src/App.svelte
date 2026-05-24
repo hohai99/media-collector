@@ -9,9 +9,12 @@
     import { currentPage, masterFolder, showToast } from './stores/app.js';
     import { collections } from './stores/collections.js';
     import * as api from './services/api.js';
+    import { initFileServer } from './services/utils.js';
 
     onMount(async () => {
         try {
+            // Initialize the standalone file server URL first
+            await initFileServer();
             const folder = await api.getMasterFolder();
             if (folder) {
                 masterFolder.set(folder);

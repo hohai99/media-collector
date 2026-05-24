@@ -27,6 +27,9 @@ import {
     ResolvePlayerMedia,
     SelectSoundSource,
     GetAbsolutePath,
+    GetFileServerURL,
+    GetStreamBaseURL,
+    HasTranscoder,
 } from '../../wailsjs/go/main/App';
 
 // ─── Folder ────────────────────────────────────────────────
@@ -128,5 +131,17 @@ export async function selectSoundSource() {
 // ─── Utility ───────────────────────────────────────────────
 export async function getAbsolutePath(path) {
     return await GetAbsolutePath(path);
+}
+
+export async function getFileServerURL() {
+    return await GetFileServerURL();
+}
+
+export async function getStreamBaseURL() {
+    return await GetStreamBaseURL();
+}
+
+export async function hasTranscoder() {
+    return await HasTranscoder();
 }
 

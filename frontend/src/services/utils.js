@@ -57,17 +57,72 @@ export function debounce(fn, delay = 300) {
 }
 
 /**
- * Convert a raw filesystem path to a URL the Wails WebView2 can load.
- * e.g. "F:/Media Collector/master-folder/img.jpg" → "/localfile/F:/Media Collector/master-folder/img.jpg"
- * Returns empty string if path is empty.
+ * Cache for the file server base URL.
+ * Fetched once from the Go backend on first use.
+ */
+let _fileServerBase = null;
+
+/**
+ * Initialize the file server URL cache.
+ * Must be called once at app startup (e.g. in App.svelte onMount).
+ */
+export async function initFileServer() {
+    const { getFileServerURL } = await import('../services/api.js');
+    _fileServerBase = await getFileServerURL();
+}
+
+/**
+ * Convert a raw filesystem path to a URL served by the standalone file server.
+ * e.g. "F:/folder/img.jpg" → "http://127.0.0.1:12345/file/F%3A/folder/img.jpg"
+ * Returns empty string if path is empty or server not initialized.
  */
 export function localFileUrl(path) {
     if (!path) return '';
-    // Normalise to forward slashes
+    if (!_fileServerBase) {
+        // Fallback until initFileServer() completes
+        const normalized = path.replace(/\\/g, '/');
+        const encoded = normalized.split('/').map(s => encodeURIComponent(s)).join('/');
+        return '/localfile/' + encoded;
+    }
+    // Normalise to forward slashes and encode each segment
     const normalized = path.replace(/\\/g, '/');
-    // Encode each path segment to handle spaces, unicode, etc.
-    // but keep the '/' separators intact
-    const encoded = normalized.split('/').map(segment => encodeURIComponent(segment)).join('/');
-    return '/localfile/' + encoded;
+    const encoded = normalized.split('/').map(s => encodeURIComponent(s)).join('/');
+    return _fileServerBase + encoded;
 }
 
+/**
+ * Build a thumbnail URL served by the standalone file server.
+ * e.g. "http://127.0.0.1:12345/thumb?path=F%3A%2Ffolder%2Fimg.jpg&w=300&h=300&fit=cover"
+ * Returns empty string if path is empty or server not initialized.
+ */
+export function localThumbUrl(path, w = 300, h = 300, fit = 'cover') {
+    if (!path || !_fileServerBase) return '';
+    const thumbBase = _fileServerBase.replace('/file/', '/thumb');
+    const normalized = path.replace(/\\/g, '/');
+    return `${thumbBase}?path=${encodeURIComponent(normalized)}&w=${w}&h=${h}&fit=${fit}`;
+}
+
+/**
+ * Build a stream URL for video transcoding (HLS).
+ * e.g. "http://127.0.0.1:12345/stream?path=F%3A%2Ffolder%2Fvideo.mkv"
+ */
+export function localStreamUrl(path) {
+    if (!path || !_fileServerBase) return '';
+    const streamBase = _fileServerBase.replace('/file/', '/stream');
+    const normalized = path.replace(/\\/g, '/');
+    return `${streamBase}?path=${encodeURIComponent(normalized)}`;
+}
+
+/**
+ * Check if a video file extension requires transcoding (not natively
+ * supported by browsers). MP4 and WebM are natively supported.
+ */
+const NATIVE_VIDEO_EXTS = new Set(['.mp4', '.webm']);
+
+export function needsTranscode(path) {
+    if (!path) return false;
+    const ext = getExtension(path);
+    const videoExts = new Set(['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm']);
+    if (!videoExts.has(ext)) return false;
+    return !NATIVE_VIDEO_EXTS.has(ext);
+}

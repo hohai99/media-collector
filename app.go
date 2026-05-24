@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"path/filepath"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -13,6 +13,7 @@ import (
 	"media-collector/domain"
 	"media-collector/filesystem"
 	"media-collector/repository"
+	"media-collector/server"
 	"media-collector/utils"
 )
 
@@ -20,6 +21,10 @@ import (
 type App struct {
 	ctx context.Context
 	db  *sql.DB
+
+	// Infrastructure
+	fileServer *server.FileServer
+	logger     *slog.Logger
 
 	// Services
 	mediaSvc      *core.MediaService
@@ -32,8 +37,11 @@ type App struct {
 }
 
 // NewApp creates a new App application struct.
-func NewApp() *App {
-	return &App{}
+func NewApp(fileServer *server.FileServer, logger *slog.Logger) *App {
+	return &App{
+		fileServer: fileServer,
+		logger:     logger,
+	}
 }
 
 // startup is called when the app starts. It initialises the database and
@@ -45,12 +53,14 @@ func (a *App) startup(ctx context.Context) {
 	dbPath := "media_collector.db"
 	db, err := repository.NewDB(dbPath)
 	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
+		a.logger.Error("Failed to open database", "error", err)
+		return
 	}
 	a.db = db
 
 	if err := repository.RunMigrations(db); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
+		a.logger.Error("Failed to run migrations", "error", err)
+		return
 	}
 
 	// Repositories
@@ -74,6 +84,13 @@ func (a *App) startup(ctx context.Context) {
 
 // beforeClose is called when the application is about to quit.
 func (a *App) beforeClose(ctx context.Context) (prevent bool) {
+	// Graceful shutdown of the file server (5-second timeout)
+	if a.fileServer != nil {
+		if err := a.fileServer.Shutdown(ctx); err != nil {
+			a.logger.Warn("file server shutdown error", "error", err)
+		}
+	}
+
 	if a.db != nil {
 		a.db.Close()
 	}
@@ -305,3 +322,21 @@ func (a *App) GetAbsolutePath(path string) string {
 	return filepath.ToSlash(abs)
 }
 
+// GetFileServerURL returns the base URL of the standalone file server
+// (e.g. "http://127.0.0.1:12345/file/"). The frontend uses this to
+// construct media URLs that bypass the Wails asset pipeline.
+func (a *App) GetFileServerURL() string {
+	return a.fileServer.BaseURL()
+}
+
+// GetStreamBaseURL returns the base URL for video stream requests
+// (e.g. "http://127.0.0.1:12345/stream"). Used by the frontend to
+// build HLS stream URLs for non-native video formats.
+func (a *App) GetStreamBaseURL() string {
+	return a.fileServer.StreamBaseURL()
+}
+
+// HasTranscoder returns true if video transcoding is available (ffmpeg found).
+func (a *App) HasTranscoder() bool {
+	return a.fileServer.HasTranscoder()
+}

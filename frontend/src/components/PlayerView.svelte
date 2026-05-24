@@ -1,7 +1,8 @@
 <script>
     import { createEventDispatcher, onDestroy, onMount } from 'svelte';
-    import { formatDuration, localFileUrl } from '../services/utils.js';
+    import { formatDuration, localFileUrl, localStreamUrl, needsTranscode } from '../services/utils.js';
     import { isPlaying, currentIndex, playerMedia } from '../stores/player.js';
+    import Hls from 'hls.js';
 
     export let mediaList = [];
     export let timePerPicture = 5;
@@ -133,7 +134,32 @@
         clearTimers();
         isPlaying.set(false);
         stopSound();
+        destroyHls();
     });
+
+    let hlsInstance = null;
+
+    function attachHls(node) {
+        destroyHls();
+        if (currentMedia && currentMedia.type === 'video' && needsTranscode(currentMedia.path)) {
+            const streamUrl = localStreamUrl(currentMedia.path);
+            if (Hls.isSupported()) {
+                hlsInstance = new Hls();
+                hlsInstance.loadSource(streamUrl);
+                hlsInstance.attachMedia(node);
+                hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+                    node.play().catch(() => {});
+                });
+            }
+        }
+    }
+
+    function destroyHls() {
+        if (hlsInstance) {
+            hlsInstance.destroy();
+            hlsInstance = null;
+        }
+    }
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
@@ -160,14 +186,25 @@
             {/key}
         {:else if currentMedia.type === 'video'}
             {#key $currentIndex}
-                <video
-                    src={localFileUrl(currentMedia.path)}
-                    autoplay
-                    on:ended={handleVideoEnded}
-                    class="crossfade-enter"
-                >
-                    <track kind="captions" />
-                </video>
+                {#if needsTranscode(currentMedia.path)}
+                    <video
+                        use:attachHls
+                        on:ended={handleVideoEnded}
+                        class="crossfade-enter"
+                        controls
+                    >
+                        <track kind="captions" />
+                    </video>
+                {:else}
+                    <video
+                        src={localFileUrl(currentMedia.path)}
+                        autoplay
+                        on:ended={handleVideoEnded}
+                        class="crossfade-enter"
+                    >
+                        <track kind="captions" />
+                    </video>
+                {/if}
             {/key}
         {:else if currentMedia.type === 'audio'}
             <div class="audio-display">
